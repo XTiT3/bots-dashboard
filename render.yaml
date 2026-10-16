@@ -1,0 +1,33 @@
+﻿services:
+  - type: web
+    name: bots-dashboard-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: BOT_DATA_DIR
+        value: /data
+      - key: DATABASE_URL
+        value: sqlite:////data/dashboard.db
+      - key: BOT_ALI_TOKEN
+        sync: false
+      - key: BOT_ORGANIZER_TOKEN
+        sync: false
+      - key: BOT_TRANSLATOR_TOKEN
+        sync: false
+    disk:
+      name: dashboard-data
+      mountPath: /data
+      sizeGB: 1
