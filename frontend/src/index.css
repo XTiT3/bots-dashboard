@@ -1,0 +1,11 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html, body, #root { height: 100%; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: radial-gradient(1200px 600px at 10% -10%, rgba(34,211,238,0.10), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(37,99,235,0.15), transparent 60%), #050b1a; }
+.card { @apply rounded-2xl border border-white/5 bg-navy-900/70 backdrop-blur shadow-glow; }
+.btn { @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition; }
+.btn-primary { @apply bg-brand-blue hover:bg-blue-600 text-white; }
+.btn-ghost { @apply bg-white/5 hover:bg-white/10 text-slate-100; }
+.pill { @apply rounded-full px-2.5 py-1 text-xs font-semibold; }
+.input { @apply w-full rounded-xl bg-navy-950/70 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-cyan/50; }
