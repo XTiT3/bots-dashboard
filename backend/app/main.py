@@ -1,8 +1,11 @@
 ﻿from contextlib import asynccontextmanager
+import os
+import traceback
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, select
 from .auth import (cookie_name, exchange_code, fetch_me, fetch_my_guilds, oauth_login_url, require_user, sign_session, upsert_user)
 from .bot_registry import BOTS, bot_live, bot_token, data_dir
@@ -18,8 +21,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Discord Bots Dashboard API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[settings.FRONTEND_URL], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+@app.exception_handler(Exception)
+async def all_errors(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print("="*60)
+    print("ERROR on", request.url.path)
+    print(tb)
+    print("="*60)
+    return JSONResponse(status_code=500, content={"error": str(exc), "traceback": tb.splitlines()[-5:]})
+
 @app.get("/api/health")
-def health(): return {"ok": True, "data_dir": str(data_dir())}
+def health(): return {"ok": True, "data_dir": str(data_dir()), "secret_set": bool(settings.DISCORD_CLIENT_SECRET)}
 
 @app.get("/api/auth/login")
 def auth_login(): return RedirectResponse(oauth_login_url())
@@ -27,12 +39,15 @@ def auth_login(): return RedirectResponse(oauth_login_url())
 @app.get("/api/auth/callback")
 async def auth_callback(code: str):
     try:
-        payload = await exchange_code(code); me = await fetch_me(payload["access_token"])
-    except httpx.HTTPError as e: raise HTTPException(status_code=400, detail=f"Discord OAuth failed: {e}")
-    user = upsert_user(payload, me)
-    redirect = RedirectResponse(settings.FRONTEND_URL)
-    redirect.set_cookie(cookie_name(), sign_session(user.id), httponly=True, samesite="lax", secure=False, max_age=60*60*24*30)
-    return redirect
+        payload = await exchange_code(code)
+        me = await fetch_me(payload["access_token"])
+        user = upsert_user(payload, me)
+        redirect = RedirectResponse(settings.FRONTEND_URL)
+        redirect.set_cookie(cookie_name(), sign_session(user.id), httponly=True, samesite="lax", secure=False, max_age=60*60*24*30)
+        return redirect
+    except Exception as e:
+        print("CALLBACK ERROR:", traceback.format_exc())
+        return JSONResponse(status_code=500, content={"callback_error": str(e), "type": type(e).__name__})
 
 @app.post("/api/auth/logout")
 def auth_logout(response: Response):
@@ -96,3 +111,17 @@ async def bots_in_guild(guild_id: str, user: User = Depends(require_user)):
         present = any(str(g["id"]) == guild_id for g in guilds)
         out.append({"id": bot_id, "name": entry["name"], "color": entry["color"], "present": present, "live": bot_live(bot_id)})
     return out
+
+# ---- Serve the React frontend ----
+_FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.isdir(_FRONTEND_DIST):
+    _assets = os.path.join(_FRONTEND_DIST, "assets")
+    if os.path.isdir(_assets):
+        app.mount("/assets", StaticFiles(directory=_assets), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        fp = os.path.join(_FRONTEND_DIST, full_path)
+        if full_path and os.path.isfile(fp):
+            return FileResponse(fp)
+        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))

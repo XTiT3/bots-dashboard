@@ -45,7 +45,7 @@ async def fetch_my_guilds(token: str) -> list[dict]:
         r.raise_for_status()
         return r.json()
 def upsert_user(token_payload: dict, me: dict) -> User:
-    expires = dt.datetime.utcnow() + dt.timedelta(seconds=int(token_payload.get("expires_in", 604800)))
+    expires = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=int(token_payload.get("expires_in", 604800)))
     with Session(engine) as s:
         existing = s.exec(select(User).where(User.discord_id == me["id"])).first()
         if existing is None:
